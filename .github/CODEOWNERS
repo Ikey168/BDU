@@ -1,0 +1,33 @@
+# CODEOWNERS file for BDU Website
+# This file defines who is responsible for code in specific parts of the repository
+# Lines starting with a '#' are comments.
+# Each line is a file pattern followed by one or more owners.
+
+# Global fallback owners (will be requested for review on every PR unless overridden)
+* @Ikey168
+
+# Critical frontend paths - require review from frontend maintainers
+/frontend/ @Ikey168
+/frontend/pages/ @Ikey168
+/frontend/components/ @Ikey168
+/frontend/src/ @Ikey168
+
+# Critical backend/API paths - require review from backend maintainers  
+/workers/ @Ikey168
+/workers/api/ @Ikey168
+/workers/src/ @Ikey168
+
+# Infrastructure and configuration files
+/.github/ @Ikey168
+/wrangler.toml @Ikey168
+/package.json @Ikey168
+/package-lock.json @Ikey168
+/yarn.lock @Ikey168
+
+# Documentation
+/README.md @Ikey168
+/docs/ @Ikey168
+
+# Database and migration files
+/workers/migrations/ @Ikey168
+/workers/schema/ @Ikey168
