@@ -1,0 +1,204 @@
+name: Verify DNS and SSL Configuration
+
+on:
+  workflow_dispatch:
+    inputs:
+      domain:
+        description: 'Domain to verify (default: debating.de)'
+        required: false
+        default: 'debating.de'
+        type: string
+  schedule:
+    # Run daily at 6 AM UTC to monitor configuration
+    - cron: '0 6 * * *'
+
+jobs:
+  verify-configuration:
+    name: Verify DNS and SSL Configuration
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        
+      - name: Set domain variable
+        id: domain
+        run: |
+          if [ "${{ github.event.inputs.domain }}" != "" ]; then
+            echo "domain=${{ github.event.inputs.domain }}" >> $GITHUB_OUTPUT
+          else
+            echo "domain=debating.de" >> $GITHUB_OUTPUT
+          fi
+          
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y dnsutils curl openssl bc
+          
+      - name: Run DNS and SSL verification
+        run: |
+          chmod +x ./scripts/verify-dns-ssl.sh
+          ./scripts/verify-dns-ssl.sh ${{ steps.domain.outputs.domain }}
+          
+      - name: Test SSL Labs API (optional)
+        run: |
+          echo "Checking SSL Labs rating for ${{ steps.domain.outputs.domain }}..."
+          # Note: SSL Labs API has rate limits, use sparingly
+          curl -s "https://api.ssllabs.com/api/v3/analyze?host=${{ steps.domain.outputs.domain }}&publish=off&startNew=off&fromCache=on&all=done" | jq -r '.endpoints[0].grade // "Not available"' || echo "SSL Labs check skipped"
+          
+      - name: Check website accessibility
+        run: |
+          echo "Testing website accessibility..."
+          
+          # Test HTTP redirect
+          echo "Testing HTTP to HTTPS redirect..."
+          HTTP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" -L "http://${{ steps.domain.outputs.domain }}")
+          echo "HTTP redirect status: $HTTP_STATUS"
+          
+          # Test HTTPS
+          echo "Testing HTTPS accessibility..."
+          HTTPS_STATUS=$(curl -s -o /dev/null -w "%{http_code}" "https://${{ steps.domain.outputs.domain }}")
+          echo "HTTPS status: $HTTPS_STATUS"
+          
+          # Test WWW redirect
+          echo "Testing WWW redirect..."
+          WWW_STATUS=$(curl -s -o /dev/null -w "%{http_code}" -L "https://www.${{ steps.domain.outputs.domain }}")
+          echo "WWW redirect status: $WWW_STATUS"
+          
+          # Verify all are successful
+          if [ "$HTTPS_STATUS" = "200" ] && [ "$WWW_STATUS" = "200" ]; then
+            echo "✅ All accessibility tests passed"
+          else
+            echo "❌ Some accessibility tests failed"
+            exit 1
+          fi
+          
+      - name: Check security headers
+        run: |
+          echo "Checking security headers..."
+          
+          HEADERS=$(curl -s -I "https://${{ steps.domain.outputs.domain }}")
+          
+          # Check for important security headers
+          if echo "$HEADERS" | grep -i "strict-transport-security"; then
+            echo "✅ HSTS header present"
+          else
+            echo "⚠️ HSTS header missing"
+          fi
+          
+          if echo "$HEADERS" | grep -i "x-frame-options"; then
+            echo "✅ X-Frame-Options header present"
+          else
+            echo "⚠️ X-Frame-Options header missing"
+          fi
+          
+          if echo "$HEADERS" | grep -i "x-content-type-options"; then
+            echo "✅ X-Content-Type-Options header present"
+          else
+            echo "⚠️ X-Content-Type-Options header missing"
+          fi
+          
+      - name: Performance check
+        run: |
+          echo "Running basic performance check..."
+          
+          # Measure response time
+          RESPONSE_TIME=$(curl -o /dev/null -s -w "%{time_total}" "https://${{ steps.domain.outputs.domain }}")
+          echo "Response time: ${RESPONSE_TIME}s"
+          
+          # Check if response time is acceptable (< 3 seconds)
+          if (( $(echo "$RESPONSE_TIME < 3.0" | bc -l) )); then
+            echo "✅ Response time is acceptable"
+          else
+            echo "⚠️ Response time is slow (> 3s)"
+          fi
+          
+          # Check transfer size
+          TRANSFER_SIZE=$(curl -o /dev/null -s -w "%{size_download}" "https://${{ steps.domain.outputs.domain }}")
+          echo "Transfer size: ${TRANSFER_SIZE} bytes"
+          
+      - name: Cloudflare integration check
+        run: |
+          echo "Checking Cloudflare integration..."
+          
+          HEADERS=$(curl -s -I "https://${{ steps.domain.outputs.domain }}")
+          
+          if echo "$HEADERS" | grep -i "cf-ray"; then
+            echo "✅ Cloudflare integration detected"
+            CF_RAY=$(echo "$HEADERS" | grep -i "cf-ray" | cut -d: -f2- | tr -d ' \r')
+            echo "CF-Ray: $CF_RAY"
+          else
+            echo "❌ Cloudflare integration not detected"
+            exit 1
+          fi
+          
+          if echo "$HEADERS" | grep -i "cf-cache-status"; then
+            CACHE_STATUS=$(echo "$HEADERS" | grep -i "cf-cache-status" | cut -d: -f2- | tr -d ' \r')
+            echo "Cache Status: $CACHE_STATUS"
+          fi
+          
+      - name: DNS propagation check
+        run: |
+          echo "Checking DNS propagation from multiple locations..."
+          
+          # Check from different DNS servers
+          echo "Checking from Google DNS (8.8.8.8):"
+          nslookup ${{ steps.domain.outputs.domain }} 8.8.8.8 || true
+          
+          echo "Checking from Cloudflare DNS (1.1.1.1):"
+          nslookup ${{ steps.domain.outputs.domain }} 1.1.1.1 || true
+          
+          echo "Checking from Quad9 DNS (9.9.9.9):"
+          nslookup ${{ steps.domain.outputs.domain }} 9.9.9.9 || true
+          
+      - name: Generate summary report
+        run: |
+          echo "## DNS and SSL Verification Summary" > verification-report.md
+          echo "" >> verification-report.md
+          echo "**Domain:** ${{ steps.domain.outputs.domain }}" >> verification-report.md
+          echo "**Date:** $(date)" >> verification-report.md
+          echo "**Status:** ✅ Verification completed" >> verification-report.md
+          echo "" >> verification-report.md
+          
+          echo "### Quick Checks" >> verification-report.md
+          echo "- [x] DNS resolution working" >> verification-report.md
+          echo "- [x] HTTPS accessible" >> verification-report.md
+          echo "- [x] SSL certificate valid" >> verification-report.md
+          echo "- [x] Cloudflare integration active" >> verification-report.md
+          echo "" >> verification-report.md
+          
+          echo "### Recommendations" >> verification-report.md
+          echo "- Monitor SSL certificate expiration" >> verification-report.md
+          echo "- Review security headers regularly" >> verification-report.md
+          echo "- Check performance metrics monthly" >> verification-report.md
+          echo "- Verify DNS propagation after changes" >> verification-report.md
+          echo "" >> verification-report.md
+          
+          echo "For detailed configuration, see: \`.github/CLOUDFLARE_DNS_SSL.md\`" >> verification-report.md
+          
+      - name: Upload verification report
+        uses: actions/upload-artifact@v4
+        with:
+          name: dns-ssl-verification-report
+          path: verification-report.md
+          retention-days: 30
+          
+  notify-status:
+    name: Notify Verification Status
+    runs-on: ubuntu-latest
+    needs: verify-configuration
+    if: always()
+    
+    steps:
+      - name: Notify success
+        if: needs.verify-configuration.result == 'success'
+        run: |
+          echo "✅ DNS and SSL verification completed successfully"
+          echo "Domain configuration is working correctly"
+          
+      - name: Notify failure
+        if: needs.verify-configuration.result == 'failure'
+        run: |
+          echo "❌ DNS and SSL verification failed"
+          echo "Please check the logs and configuration"
+          echo "See .github/CLOUDFLARE_DNS_SSL.md for troubleshooting"
