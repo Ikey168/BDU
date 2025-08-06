@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Berlin Debating Union Website
+    url: https://berlin-debating-union.de
+    about: Visit our main website
+  - name: Community Discussion
+    url: https://github.com/Ikey168/BDU/discussions
+    about: Ask questions and discuss with the community
