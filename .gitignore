@@ -39,6 +39,14 @@ next-env.d.ts
 .wrangler/
 wrangler.toml
 
+# Terraform
+*.tfstate
+*.tfstate.*
+.terraform/
+.terraform.lock.hcl
+terraform.tfvars
+*.tfplan
+
 # IDE
 .vscode/
 .idea/

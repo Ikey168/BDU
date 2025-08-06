@@ -1,0 +1,14 @@
+# Terraform Variables File
+# Copy this file to terraform.tfvars and fill in your values
+
+# Cloudflare API Token with Zone:Edit and DNS:Edit permissions
+cloudflare_api_token = "your-cloudflare-api-token-here"
+
+# Your Cloudflare Account ID
+account_id = "your-account-id-here"
+
+# Domain name to configure
+zone_name = "debating.de"
+
+# Cloudflare Pages project name
+pages_project_name = "bdu-website"
