@@ -1,0 +1,2 @@
+# This file ensures the workers directory is tracked by git
+# This directory will contain the Cloudflare Workers backend code
