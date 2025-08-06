@@ -11,13 +11,24 @@ jobs:
   frontend-checks:
     name: Frontend Checks
     runs-on: ubuntu-latest
-    if: contains(github.event.head_commit.modified, 'frontend/') || github.event_name == 'pull_request'
     
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
         
+      - name: Check if frontend has package.json
+        id: check-frontend
+        run: |
+          if [ -f "frontend/package.json" ]; then
+            echo "exists=true" >> $GITHUB_OUTPUT
+            echo "Frontend package.json found"
+          else
+            echo "exists=false" >> $GITHUB_OUTPUT
+            echo "Frontend package.json not found - skipping frontend checks"
+          fi
+        
       - name: Setup Node.js
+        if: steps.check-frontend.outputs.exists == 'true'
         uses: actions/setup-node@v4
         with:
           node-version: '18'
@@ -25,21 +36,25 @@ jobs:
           cache-dependency-path: frontend/package-lock.json
           
       - name: Install frontend dependencies
+        if: steps.check-frontend.outputs.exists == 'true'
         run: |
           cd frontend
           npm ci
           
       - name: Run frontend linting
+        if: steps.check-frontend.outputs.exists == 'true'
         run: |
           cd frontend
           npm run lint
           
       - name: Run frontend tests
+        if: steps.check-frontend.outputs.exists == 'true'
         run: |
           cd frontend
           npm run test
           
       - name: Build frontend
+        if: steps.check-frontend.outputs.exists == 'true'
         run: |
           cd frontend
           npm run build
@@ -48,13 +63,24 @@ jobs:
   workers-checks:
     name: Workers Checks
     runs-on: ubuntu-latest
-    if: contains(github.event.head_commit.modified, 'workers/') || github.event_name == 'pull_request'
     
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
         
+      - name: Check if workers has package.json
+        id: check-workers
+        run: |
+          if [ -f "workers/package.json" ]; then
+            echo "exists=true" >> $GITHUB_OUTPUT
+            echo "Workers package.json found"
+          else
+            echo "exists=false" >> $GITHUB_OUTPUT
+            echo "Workers package.json not found - skipping workers checks"
+          fi
+        
       - name: Setup Node.js
+        if: steps.check-workers.outputs.exists == 'true'
         uses: actions/setup-node@v4
         with:
           node-version: '18'
@@ -62,21 +88,25 @@ jobs:
           cache-dependency-path: workers/package-lock.json
           
       - name: Install workers dependencies
+        if: steps.check-workers.outputs.exists == 'true'
         run: |
           cd workers
           npm ci
           
       - name: Run workers linting
+        if: steps.check-workers.outputs.exists == 'true'
         run: |
           cd workers
           npm run lint
           
       - name: Run workers tests
+        if: steps.check-workers.outputs.exists == 'true'
         run: |
           cd workers
           npm run test
           
       - name: Type check workers
+        if: steps.check-workers.outputs.exists == 'true'
         run: |
           cd workers
           npm run type-check
@@ -114,16 +144,26 @@ jobs:
     steps:
       - name: Check all jobs status
         run: |
+          echo "Frontend checks: ${{ needs.frontend-checks.result }}"
+          echo "Workers checks: ${{ needs.workers-checks.result }}"
+          echo "Security checks: ${{ needs.security-checks.result }}"
+          
+          # Frontend checks - success or skipped (if no package.json) is OK
           if [[ "${{ needs.frontend-checks.result }}" != "success" && "${{ needs.frontend-checks.result }}" != "skipped" ]]; then
-            echo "Frontend checks failed"
+            echo "❌ Frontend checks failed"
             exit 1
           fi
+          
+          # Workers checks - success or skipped (if no package.json) is OK
           if [[ "${{ needs.workers-checks.result }}" != "success" && "${{ needs.workers-checks.result }}" != "skipped" ]]; then
-            echo "Workers checks failed"
+            echo "❌ Workers checks failed"
             exit 1
           fi
+          
+          # Security checks must always pass
           if [[ "${{ needs.security-checks.result }}" != "success" ]]; then
-            echo "Security checks failed"
+            echo "❌ Security checks failed"
             exit 1
           fi
-          echo "All checks passed!"
+          
+          echo "✅ All checks passed!"
