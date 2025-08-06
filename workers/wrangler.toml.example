@@ -1,0 +1,65 @@
+# Wrangler Configuration for BDU Workers
+# This file configures Cloudflare Workers deployment
+
+name = "bdu-api"
+main = "src/index.ts"
+compatibility_date = "2024-08-06"
+
+# Development environment (default)
+[vars]
+ENVIRONMENT = "development"
+CORS_ORIGIN = "http://localhost:3000"
+
+# Development D1 database binding
+[[d1_databases]]
+binding = "DB"
+database_name = "bdu-development"
+database_id = "your-dev-database-id-here"
+
+# Production environment
+[env.production]
+name = "bdu-api-production"
+
+[env.production.vars]
+ENVIRONMENT = "production"
+CORS_ORIGIN = "https://your-domain.com"
+
+[[env.production.d1_databases]]
+binding = "DB"
+database_name = "bdu-production"
+database_id = "your-prod-database-id-here"
+
+# Staging environment (optional)
+[env.staging]
+name = "bdu-api-staging"
+
+[env.staging.vars]
+ENVIRONMENT = "staging"
+CORS_ORIGIN = "https://staging.your-domain.com"
+
+[[env.staging.d1_databases]]
+binding = "DB"
+database_name = "bdu-staging"
+database_id = "your-staging-database-id-here"
+
+# KV namespaces (if needed for caching)
+# [[kv_namespaces]]
+# binding = "CACHE"
+# id = "your-kv-namespace-id"
+# preview_id = "your-preview-kv-namespace-id"
+
+# R2 buckets (if needed for file storage)
+# [[r2_buckets]]
+# binding = "STORAGE"
+# bucket_name = "bdu-storage"
+
+# Durable Objects (if needed)
+# [[durable_objects.bindings]]
+# name = "RATE_LIMITER"
+# class_name = "RateLimiter"
+
+# Custom domains (configure after deployment)
+# [env.production]
+# routes = [
+#   { pattern = "api.your-domain.com/*", zone_name = "your-domain.com" }
+# ]
